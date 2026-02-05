@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>전설 확률 계산기 (1%)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body {
   font-family: Arial, sans-serif;
@@ -27,6 +28,11 @@ button {
   font-size: 18px;
   line-height: 1.8;
 }
+canvas {
+  margin-top: 40px;
+  background: #fff;
+  border-radius: 8px;
+}
 </style>
 </head>
 <body>
@@ -43,8 +49,11 @@ button {
 
 <div class="result" id="output"></div>
 
+<canvas id="chart" width="800" height="400"></canvas>
+
 <script>
 const p = 0.01;
+let chart;
 
 function combination(n, k) {
   if (k > n || k < 0) return 0;
@@ -66,21 +75,55 @@ function calculate() {
   const m = parseInt(document.getElementById("m").value);
 
   if (isNaN(n) || isNaN(m) || n < 0 || m < 0 || m > n) {
-    document.getElementById("output").innerHTML = "입력값을 확인하세요.";
+    document.getElementById("output").innerHTML = "입력값 확인";
     return;
   }
 
   let exact = binomialProb(n, m);
-
   let atLeast = 0;
-  for (let k = m; k <= n; k++) {
-    atLeast += binomialProb(n, k);
-  }
+  for (let k = m; k <= n; k++) atLeast += binomialProb(n, k);
 
   document.getElementById("output").innerHTML = `
-    정확히 ${m}개 나올 확률: <b>${(exact * 100).toFixed(4)}%</b><br>
-    ${m}개 이상 나올 확률: <b>${(atLeast * 100).toFixed(4)}%</b>
+    정확히 ${m}개: <b>${(exact*100).toFixed(4)}%</b><br>
+    ${m}개 이상: <b>${(atLeast*100).toFixed(4)}%</b>
   `;
+
+  drawChart(n);
+}
+
+function drawChart(n) {
+  let mean = n * p;
+  let range = Math.ceil(mean + 5 * Math.sqrt(n*p*(1-p))); // 분포 범위 자동 설정
+
+  let labels = [];
+  let data = [];
+
+  for (let k = 0; k <= range; k++) {
+    labels.push(k);
+    data.push(binomialProb(n, k) * 100);
+  }
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '확률 (%)',
+        data: data,
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: { title: { display: true, text: '전설 개수' }},
+        y: { title: { display: true, text: '확률 (%)' }}
+      }
+    }
+  });
 }
 </script>
 

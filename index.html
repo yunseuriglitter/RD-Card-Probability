@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>전설 확률 계산기 (1%)</title>
+<title>전설 확률 계산기</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body {
@@ -12,39 +12,40 @@ body {
   text-align: center;
   padding: 40px;
 }
-input {
+input, select {
   padding: 8px;
   margin: 10px;
-  width: 120px;
+  width: 150px;
   text-align: center;
 }
 button {
   padding: 10px 20px;
   font-size: 16px;
-  cursor: pointer;
-}
-.result {
-  margin-top: 25px;
-  font-size: 18px;
-  line-height: 1.8;
 }
 canvas {
   margin-top: 40px;
   background: #fff;
   border-radius: 8px;
 }
+.result {
+  margin-top: 25px;
+  font-size: 18px;
+  line-height: 1.8;
+}
 </style>
 </head>
 <body>
 
 <h1>전설 확률 계산기</h1>
-<p>상자 1개당 전설 확률 = <b>1%</b></p>
+<p>전설 확률 = <b>1%</b></p>
 
-<div>
-  상자 개수 n: <input type="number" id="n" min="1" value="100">
-  전설 개수 m: <input type="number" id="m" min="0" value="1">
-</div>
+<select id="mode">
+  <option value="box">상자 개수</option>
+  <option value="card">카드 개수</option>
+</select>
 
+<input type="number" id="inputValue" value="100">
+<input type="number" id="m" value="1">
 <button onclick="calculate()">계산</button>
 
 <div class="result" id="output"></div>
@@ -54,62 +55,55 @@ canvas {
 const p = 0.01;
 let chart;
 
-// 포아송 확률
-function poissonProb(lambda, k) {
-  let fact = 1;
-  for (let i = 2; i <= k; i++) fact *= i;
-  return Math.exp(-lambda) * (lambda ** k) / fact;
+function normalPDF(x, mean, std) {
+  return (1 / (std * Math.sqrt(2 * Math.PI))) *
+         Math.exp(-0.5 * ((x - mean) / std) ** 2);
 }
 
-// 이항 확률 (작은 n용)
-function binomialProb(n, m) {
-  let res = 1;
-  for (let i = 1; i <= m; i++) {
-    res *= (n - i + 1) / i;
-  }
-  return res * (p ** m) * ((1 - p) ** (n - m));
+function erf(x) {
+  const sign = x >= 0 ? 1 : -1;
+  x = Math.abs(x);
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,
+        a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t = 1/(1+p*x);
+  const y = 1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign*y;
+}
+function normalCDF(x, mean, std) {
+  return 0.5 * (1 + erf((x - mean) / (std * Math.sqrt(2))));
 }
 
 function calculate() {
-  const n = parseInt(document.getElementById("n").value);
-  const m = parseInt(document.getElementById("m").value);
-  if (isNaN(n) || isNaN(m) || m > n || m < 0) {
-    document.getElementById("output").innerHTML = "입력값 오류";
-    return;
-  }
+  const mode = document.getElementById("mode").value;
+  const input = parseFloat(document.getElementById("inputValue").value);
+  const m = parseFloat(document.getElementById("m").value);
 
-  const lambda = n * p;
-  let exact = 0, atLeast = 0;
+  let n = mode === "card" ? input * 0.4 : input;
+  const mean = n * p;
+  const std = Math.sqrt(n * p * (1 - p));
+  const modeValue = Math.floor((n + 1) * p);
 
-  if (n < 10000) {
-    exact = binomialProb(n, m);
-    for (let k = m; k <= n; k++) atLeast += binomialProb(n, k);
-  } else {
-    exact = poissonProb(lambda, m);
-    let max = Math.ceil(lambda + 6 * Math.sqrt(lambda));
-    for (let k = m; k <= max; k++) atLeast += poissonProb(lambda, k);
-  }
-
-  let mostLikely = Math.floor(lambda);
+  const exact = normalPDF(m, mean, std);
+  const atLeast = 1 - normalCDF(m - 0.5, mean, std);
 
   document.getElementById("output").innerHTML = `
-    정확히 ${m}개: <b>${(exact*100).toFixed(6)}%</b><br>
-    ${m}개 이상: <b>${(atLeast*100).toFixed(6)}%</b><br>
-    가장 가능성 높은 개수 ≈ <b>${mostLikely}개</b>
+    계산된 상자 수 n = <b>${Math.round(n)}</b><br>
+    최빈값 ≈ <b>${modeValue}개</b><br>
+    정확히 ${m}개 (근사): <b>${(exact*100).toFixed(6)}%</b><br>
+    ${m}개 이상 (근사): <b>${(atLeast*100).toFixed(6)}%</b>
   `;
 
-  drawChart(lambda);
+  drawChart(mean, std, modeValue);
 }
 
-function drawChart(lambda) {
-  let mean = lambda;
-  let start = Math.max(0, Math.floor(mean - 5 * Math.sqrt(mean)));
-  let end = Math.ceil(mean + 5 * Math.sqrt(mean));
+function drawChart(mean, std, modeValue) {
+  let start = Math.max(0, Math.floor(mean - 3 * std));
+  let end = Math.ceil(mean + 3 * std);
 
   let labels = [], data = [];
-  for (let k = start; k <= end; k++) {
-    labels.push(k);
-    data.push(poissonProb(mean, k) * 100);
+  for (let x = start; x <= end; x++) {
+    labels.push(x);
+    data.push(normalPDF(x, mean, std) * 100);
   }
 
   if (chart) chart.destroy();
@@ -119,8 +113,8 @@ function drawChart(lambda) {
     data: {
       labels,
       datasets: [{
-        label: '확률 (%)',
-        data
+        data,
+        backgroundColor: labels.map(x => x === modeValue ? "#ff4444" : "#4488ff")
       }]
     },
     options: {

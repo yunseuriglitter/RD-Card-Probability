@@ -15,7 +15,7 @@ body {
 input {
   padding: 8px;
   margin: 10px;
-  width: 100px;
+  width: 120px;
   text-align: center;
 }
 button {
@@ -24,7 +24,7 @@ button {
   cursor: pointer;
 }
 .result {
-  margin-top: 30px;
+  margin-top: 25px;
   font-size: 18px;
   line-height: 1.8;
 }
@@ -41,66 +41,75 @@ canvas {
 <p>상자 1개당 전설 확률 = <b>1%</b></p>
 
 <div>
-  상자 개수 n: <input type="number" id="n" min="0">
-  전설 개수 m: <input type="number" id="m" min="0">
+  상자 개수 n: <input type="number" id="n" min="1" value="100">
+  전설 개수 m: <input type="number" id="m" min="0" value="1">
 </div>
 
 <button onclick="calculate()">계산</button>
 
 <div class="result" id="output"></div>
-
-<canvas id="chart" width="800" height="400"></canvas>
+<canvas id="chart" width="900" height="420"></canvas>
 
 <script>
 const p = 0.01;
 let chart;
 
-function combination(n, k) {
-  if (k > n || k < 0) return 0;
-  if (k === 0 || k === n) return 1;
-  k = Math.min(k, n - k);
-  let res = 1;
-  for (let i = 1; i <= k; i++) {
-    res = res * (n - k + i) / i;
-  }
-  return res;
+// 포아송 확률
+function poissonProb(lambda, k) {
+  let fact = 1;
+  for (let i = 2; i <= k; i++) fact *= i;
+  return Math.exp(-lambda) * (lambda ** k) / fact;
 }
 
+// 이항 확률 (작은 n용)
 function binomialProb(n, m) {
-  return combination(n, m) * (p ** m) * ((1 - p) ** (n - m));
+  let res = 1;
+  for (let i = 1; i <= m; i++) {
+    res *= (n - i + 1) / i;
+  }
+  return res * (p ** m) * ((1 - p) ** (n - m));
 }
 
 function calculate() {
   const n = parseInt(document.getElementById("n").value);
   const m = parseInt(document.getElementById("m").value);
-
-  if (isNaN(n) || isNaN(m) || n < 0 || m < 0 || m > n) {
-    document.getElementById("output").innerHTML = "입력값 확인";
+  if (isNaN(n) || isNaN(m) || m > n || m < 0) {
+    document.getElementById("output").innerHTML = "입력값 오류";
     return;
   }
 
-  let exact = binomialProb(n, m);
-  let atLeast = 0;
-  for (let k = m; k <= n; k++) atLeast += binomialProb(n, k);
+  const lambda = n * p;
+  let exact = 0, atLeast = 0;
+
+  if (n < 10000) {
+    exact = binomialProb(n, m);
+    for (let k = m; k <= n; k++) atLeast += binomialProb(n, k);
+  } else {
+    exact = poissonProb(lambda, m);
+    let max = Math.ceil(lambda + 6 * Math.sqrt(lambda));
+    for (let k = m; k <= max; k++) atLeast += poissonProb(lambda, k);
+  }
+
+  let mostLikely = Math.floor(lambda);
 
   document.getElementById("output").innerHTML = `
-    정확히 ${m}개: <b>${(exact*100).toFixed(4)}%</b><br>
-    ${m}개 이상: <b>${(atLeast*100).toFixed(4)}%</b>
+    정확히 ${m}개: <b>${(exact*100).toFixed(6)}%</b><br>
+    ${m}개 이상: <b>${(atLeast*100).toFixed(6)}%</b><br>
+    가장 가능성 높은 개수 ≈ <b>${mostLikely}개</b>
   `;
 
-  drawChart(n);
+  drawChart(lambda);
 }
 
-function drawChart(n) {
-  let mean = n * p;
-  let range = Math.ceil(mean + 5 * Math.sqrt(n*p*(1-p))); // 분포 범위 자동 설정
+function drawChart(lambda) {
+  let mean = lambda;
+  let start = Math.max(0, Math.floor(mean - 5 * Math.sqrt(mean)));
+  let end = Math.ceil(mean + 5 * Math.sqrt(mean));
 
-  let labels = [];
-  let data = [];
-
-  for (let k = 0; k <= range; k++) {
+  let labels = [], data = [];
+  for (let k = start; k <= end; k++) {
     labels.push(k);
-    data.push(binomialProb(n, k) * 100);
+    data.push(poissonProb(mean, k) * 100);
   }
 
   if (chart) chart.destroy();
@@ -108,16 +117,14 @@ function drawChart(n) {
   chart = new Chart(document.getElementById('chart'), {
     type: 'bar',
     data: {
-      labels: labels,
+      labels,
       datasets: [{
         label: '확률 (%)',
-        data: data,
+        data
       }]
     },
     options: {
-      plugins: {
-        legend: { display: false }
-      },
+      plugins: { legend: { display: false }},
       scales: {
         x: { title: { display: true, text: '전설 개수' }},
         y: { title: { display: true, text: '확률 (%)' }}

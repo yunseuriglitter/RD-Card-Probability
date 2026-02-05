@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전설 확률 계산기 (1%)</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #0f1220;
+  color: #fff;
+  text-align: center;
+  padding: 40px;
+}
+input {
+  padding: 8px;
+  margin: 10px;
+  width: 100px;
+  text-align: center;
+}
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.result {
+  margin-top: 30px;
+  font-size: 18px;
+  line-height: 1.8;
+}
+</style>
+</head>
+<body>
+
+<h1>전설 확률 계산기</h1>
+<p>상자 1개당 전설 확률 = <b>1%</b></p>
+
+<div>
+  상자 개수 n: <input type="number" id="n" min="0">
+  전설 개수 m: <input type="number" id="m" min="0">
+</div>
+
+<button onclick="calculate()">계산</button>
+
+<div class="result" id="output"></div>
+
+<script>
+const p = 0.01;
+
+function combination(n, k) {
+  if (k > n || k < 0) return 0;
+  if (k === 0 || k === n) return 1;
+  k = Math.min(k, n - k);
+  let res = 1;
+  for (let i = 1; i <= k; i++) {
+    res = res * (n - k + i) / i;
+  }
+  return res;
+}
+
+function binomialProb(n, m) {
+  return combination(n, m) * (p ** m) * ((1 - p) ** (n - m));
+}
+
+function calculate() {
+  const n = parseInt(document.getElementById("n").value);
+  const m = parseInt(document.getElementById("m").value);
+
+  if (isNaN(n) || isNaN(m) || n < 0 || m < 0 || m > n) {
+    document.getElementById("output").innerHTML = "입력값을 확인하세요.";
+    return;
+  }
+
+  let exact = binomialProb(n, m);
+
+  let atLeast = 0;
+  for (let k = m; k <= n; k++) {
+    atLeast += binomialProb(n, k);
+  }
+
+  document.getElementById("output").innerHTML = `
+    정확히 ${m}개 나올 확률: <b>${(exact * 100).toFixed(4)}%</b><br>
+    ${m}개 이상 나올 확률: <b>${(atLeast * 100).toFixed(4)}%</b>
+  `;
+}
+</script>
+
+</body>
+</html>

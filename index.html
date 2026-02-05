@@ -78,7 +78,7 @@ function calculate() {
   const input = parseFloat(document.getElementById("inputValue").value);
   const m = parseFloat(document.getElementById("m").value);
 
-  let n = mode === "card" ? input * 0.04 : input;
+  let n = mode === "card" ? input * 0.025 : input;
   const mean = n * p;
   const std = Math.sqrt(n * p * (1 - p));
   const modeValue = Math.floor((n + 1) * p);
